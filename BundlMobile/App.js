@@ -43,6 +43,7 @@ export default function App() {
         const [msg, setMsg] = useState('');
 
         const [physicalBook, setPhysicalBook] = useState(false);
+        const [includeAudio, setIncludeAudio] = useState(false);
 
         const [dataSource, setDataSource] = useState([]);
 
@@ -849,6 +850,14 @@ useEffect(() => {
                   </View>
 
                   <View style={styles.buttonContainer}>
+
+                  <View style={{flexDirection: 'column', alignItems: 'center'}}>
+                  <Switch
+                    value={includeAudio}
+                    onValueChange={setIncludeAudio}
+                  />
+                  <Text>Allow your contributors to record audio in addition to a written message</Text>
+                </View>
 
                   <View style={{flexDirection: 'column', alignItems: 'center'}}>
                   <Switch
