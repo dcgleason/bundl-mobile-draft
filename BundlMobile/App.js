@@ -10,7 +10,90 @@ import { Picker } from '@react-native-picker/picker';
 import { Swipeable } from 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Dimensions } from 'react-native';
+import { CardField, useStripe } from '@stripe/stripe-react-native';
 
+
+function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contributors }) {
+  const { createPaymentMethod, confirmPayment } = useStripe();
+  const [cardDetails, setCardDetails] = useState(null);
+
+  const handlePay = async () => {
+    if (!cardDetails?.complete) {
+      alert('Please enter complete card details');
+      return;
+    }
+
+    // Create a payment method from the card details
+    const { error: paymentMethodError, paymentMethod } = await createPaymentMethod({
+      type: 'Card',
+      card: cardDetails,
+    });
+
+    if (paymentMethodError) {
+      console.log('Failed to create payment method:', paymentMethodError.message);
+      return;
+    }
+
+    // Create a payment intent on the server
+    const response = await fetch('http://your-server-url/secret', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: 'contributor-email@example.com', // replace with the actual contributor's email
+        amount: totalAmount,
+      }),
+    });
+
+    const data = await response.json();
+
+    // Confirm the payment
+    const { error: confirmationError } = await confirmPayment(data.client_secret, {
+      type: 'Card',
+      paymentMethodId: paymentMethod.id,
+    });
+
+    if (confirmationError) {
+      console.log('Payment confirmation error:', confirmationError.message);
+    } else {
+      // Payment was successful
+      setIsModalVisible(false);
+        // Send the welcome messages
+     sendWelcomeMessages(contributors);
+    }
+  };
+
+  return (
+    <View>
+      { (physicalBook || includeAudio) && (
+        <Button title="Pay" onPress={() => setIsModalVisible(true)} />
+      )}
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '80%', padding: 20, backgroundColor: 'white', borderRadius: 10 }}>
+            <Text>Enter your card details:</Text>
+
+            <CardField
+              postalCodeEnabled={true}
+              onCardChange={cardDetails => setCardDetails(cardDetails)}
+              style={{ height: 50, marginTop: 30 }}
+            />
+
+            <Button title="Pay" onPress={handlePay} />
+            <Button title="Cancel" onPress={() => setIsModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
 
 
 
@@ -49,6 +132,8 @@ export default function App() {
 
         const [longMessage, setLongMessage] = useState('');
         const [modalIsOpen, setModalIsOpen] = useState(false);
+        const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+
 
         const [userData, setUserData] = useState(null);
         const [recipientFullName, setRecipientFullName] = useState("");
@@ -68,6 +153,7 @@ export default function App() {
         const [tableData, setTableData] = useState([]);
         const [contactCount, setContactCount] = useState([]);
         const [isContributorsModalVisible, setIsContributorsModalVisible] = useState(false);
+        const [totalAmount, setTotalAmount] = useState(0);
 
 
         const [userInfo, setUserInfo] = useState(null);
@@ -573,7 +659,28 @@ useEffect(() => {
         };
 
 
+ 
         async function submitAndSendWelcomeMessage(contributors) {
+          // Calculate the total amount to charge
+          let totalAmount = 0;
+          if (physicalBook) {
+            totalAmount += 9900; // $99 in cents
+          }
+          if (includeAudio) {
+            totalAmount += 1500; // $15 in cents
+          }
+        
+          // If there's a charge, open the payment modal
+          if (totalAmount > 0) {
+            setTotalAmount(totalAmount);
+            setIsPaymentModalVisible(true); // if payment method is sucessfull send messages the same way as if the user diddn't select includeAudio / physicalBook
+          } else {
+            // If there's no charge, send the welcome messages directly
+            sendWelcomeMessages(contributors);
+          }
+        }
+        
+        async function sendWelcomeMessages(contributors) {
           // Prepare a group email for all contributors with an email address
           const emails = contributors.flatMap(contributor => contributor.emailAddresses || []).map(emailObj => emailObj.value);
           if (emails.length > 0) {
@@ -581,14 +688,14 @@ useEffect(() => {
             Linking.openURL(emailUrl).catch(err => console.error('Failed to send email:', err));
           }
         
-         // Prepare a group SMS for all contributors with a phone number
-            const phones = contributors
+          // Prepare a group SMS for all contributors with a phone number
+          const phones = contributors
             .map(contributor => contributor.phoneNumber.replace(/\D/g, ''))  // remove non-digit characters
             .filter(phone => phone);
-            if (phones.length > 0) {
+          if (phones.length > 0) {
             const smsUrl = `sms:${phones.join(',')}?body=Thank you for contributing to our project. We appreciate your support!`;
             Linking.openURL(smsUrl).catch(err => console.error('Failed to send SMS:', err));
-            }
+          }
         }
         
           const RenderRightActions = (progress, dragX, onPress) => {
@@ -617,6 +724,18 @@ useEffect(() => {
 
   return (
     <View style={{ padding: 40, marginTop: 32 }}>
+
+      {/* Modals */}
+
+      <PaymentModal
+        isModalVisible={isPaymentModalVisible}
+        setIsModalVisible={setIsPaymentModalVisible}
+        totalAmount={totalAmount}
+        contributors={contributors}  // Pass the contributors here
+      />
+
+
+
     <Modal visible={isModalVisible} transparent={true}>
         <View style={{ margin: 50, backgroundColor: 'gray', borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center',}}>
             <Text>Add a new contributor manually</Text>
