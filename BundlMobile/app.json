@@ -42,7 +42,15 @@
         "projectId": "ad25bdb5-8a16-4ceb-bed1-24548c65fdf2"
       }
     },
-    "plugins": ["@react-native-google-signin/google-signin"]
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.givebundl",
+          "enableGooglePay": true
+        }
+      ]
+    ]
   }
 }
-

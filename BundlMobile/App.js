@@ -7,15 +7,23 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from 'expo-linking';
 import { View, Text, TextInput, TouchableOpacity, SectionList, FlatList, Switch, Modal, StyleSheet, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { Swipeable } from 'react-native-gesture-handler';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PlatformPayButton, isPlatformPaySupported } from '@stripe/stripe-react-native';
+
 import { Dimensions } from 'react-native';
 import { CardField, useStripe } from '@stripe/stripe-react-native';
 
 
-function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contributors }) {
+function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contributors, physicalBook, includeAudio, gifterEmail }) {
   const { createPaymentMethod, confirmPayment } = useStripe();
+  const [isApplePaySupported, setIsApplePaySupported] = useState(false);
   const [cardDetails, setCardDetails] = useState(null);
+
+  useEffect(() => {
+    (async function () {
+      setIsApplePaySupported(await isPlatformPaySupported());
+    })();
+    console.log('isApplePaySupported', isApplePaySupported);
+  }, [isPlatformPaySupported]);
 
   const handlePay = async () => {
     if (!cardDetails?.complete) {
@@ -25,23 +33,22 @@ function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contribu
 
     // Create a payment method from the card details
     const { error: paymentMethodError, paymentMethod } = await createPaymentMethod({
-      type: 'Card',
+      paymentMethodType: 'Card',
       card: cardDetails,
     });
-
     if (paymentMethodError) {
       console.log('Failed to create payment method:', paymentMethodError.message);
       return;
     }
 
     // Create a payment intent on the server
-    const response = await fetch('http://your-server-url/secret', {
+    const response = await fetch('https://yay-api.herokuapp.com//stripe/secret', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: 'contributor-email@example.com', // replace with the actual contributor's email
+        email: gifterEmail, 
         amount: totalAmount,
       }),
     });
@@ -66,34 +73,59 @@ function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contribu
 
   return (
     <View>
-      { (physicalBook || includeAudio) && (
-        <Button title="Pay" onPress={() => setIsModalVisible(true)} />
-      )}
+  
 
-      <Modal
+  <Modal
         animationType="slide"
         transparent={true}
         visible={isModalVisible}
         onRequestClose={() => setIsModalVisible(false)}
       >
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ width: '80%', padding: 20, backgroundColor: 'white', borderRadius: 10 }}>
-            <Text>Enter your card details:</Text>
+          <View style={{ 
+            width: '80%', 
+            padding: 20, 
+            backgroundColor: 'white', 
+            borderRadius: 10,
+            borderWidth: 2,  // Add border width
+            borderColor: 'black',  // Change to your desired color
+          }}>
+          <Text>Enter your card details:</Text>
 
-            <CardField
-              postalCodeEnabled={true}
-              onCardChange={cardDetails => setCardDetails(cardDetails)}
-              style={{ height: 50, marginTop: 30 }}
-            />
+          <CardField
+            postalCodeEnabled={true}
+            onCardChange={cardDetails => setCardDetails(cardDetails)}
+            style={styles.cardField}
+          />
 
-            <Button title="Pay" onPress={handlePay} />
-            <Button title="Cancel" onPress={() => setIsModalVisible(false)} />
-          </View>
+          <TouchableOpacity style={styles.button} onPress={handlePay}>
+            <Text style={styles.textStyle}>Pay ${totalAmount/100}.00 with Credit Card</Text>
+          </TouchableOpacity>
+            <View>
+              {isApplePaySupported && (
+                <PlatformPayButton
+                  onPress={handlePay}
+                  type={PlatformPay.ButtonType.Order}
+                  appearance={PlatformPay.ButtonStyle.Black}
+                  borderRadius={4}
+                  style={{
+                    width: '100%',
+                    height: 50,
+                  }}
+                />
+              )}
+            </View>
+          <TouchableOpacity style={styles.button} onPress={() => setIsModalVisible(false)}>
+            <Text style={styles.textStyle}>Cancel</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </View>
+    </Modal>
     </View>
   );
 }
+
+
 
 
 
@@ -112,6 +144,9 @@ export default function App() {
 
         const [pictureSubmitted, setPictureSubmitted ] = useState(false);
         const [isTableModalVisible, setIsTableModalVisible] = useState(false);
+        const [gifterEmail, setGifterEmail] = useState("");
+        const [gifterFullName, setGifterFullName] = useState("");
+
 
         const [emailBody, setEmailBody] = useState('');
         const [emailSubject, setEmailSubject] = useState("Contribute please - 3 days left!");
@@ -133,6 +168,8 @@ export default function App() {
         const [longMessage, setLongMessage] = useState('');
         const [modalIsOpen, setModalIsOpen] = useState(false);
         const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+        const [contributors, setContributors] = useState([]);
+
 
 
         const [userData, setUserData] = useState(null);
@@ -727,12 +764,19 @@ useEffect(() => {
 
       {/* Modals */}
 
-      <PaymentModal
-        isModalVisible={isPaymentModalVisible}
-        setIsModalVisible={setIsPaymentModalVisible}
-        totalAmount={totalAmount}
-        contributors={contributors}  // Pass the contributors here
-      />
+      {
+        (physicalBook || includeAudio) ? (
+          <PaymentModal
+            isModalVisible={isPaymentModalVisible}
+            setIsModalVisible={setIsPaymentModalVisible}
+            totalAmount={totalAmount}
+            contributors={contributors}  // Pass the contributors here
+            physicalBook={physicalBook}
+            includeAudio={includeAudio}
+            gifterEmail={gifterEmail}
+          />
+        ) : null
+      }
 
 
 
@@ -876,7 +920,25 @@ useEffect(() => {
               <View style={styles.section}>
                   <Text style={styles.title}>Your Bundl Gift</Text>
                   <Text style={styles.subtitle}>Write out the recipient of the gift, the people who will contribute to the gift, and the message you will send to the contributors.</Text>
-
+                  <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Your full name</Text>
+                      <TextInput
+                          style={styles.input}
+                          value={gifterFullName}
+                          onChangeText={setGifterFullName}
+                          placeholder="Your full name"
+                      />
+                  </View>
+                  <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Your email address</Text>
+                      <TextInput
+                          style={styles.input}
+                          value={gifterEmail}
+                          type="email"
+                          onChangeText={setGifterEmail}
+                          placeholder="Your email address"
+                      />
+                  </View>
                   <View style={styles.inputContainer}>
                       <Text style={styles.label}>Recipient's full name</Text>
                       <TextInput
@@ -921,14 +983,14 @@ useEffect(() => {
                   <View style={styles.container}>
                 
                     <TouchableOpacity  style={styles.button} onPress={() => setIsContributorsModalVisible(true)}>
-                      <Text style={styles.buttonText} >View Contributors ({tableData.length})</Text>
+                      <Text style={styles.buttonText} >View selected contributors ({tableData.length})</Text>
                     </TouchableOpacity>
                     </View>
 
 
                   <View style={styles.buttonContainer} >
                       <TouchableOpacity style={styles.button} onPress={getContacts}>
-                          <Text style={styles.buttonText}>Get Your Contacts</Text>
+                          <Text style={styles.buttonText}>Select from your phone contacts</Text>
                       </TouchableOpacity> 
 
                       <View style={styles.container}>
@@ -940,7 +1002,7 @@ useEffect(() => {
                                       promptAsync();
                                   }}
                               >
-                                  <Text style={styles.buttonText}>Sign-in with Google</Text>
+                                  <Text style={styles.buttonText}>Select your Google Contacts</Text>
                               </TouchableOpacity>
                           ) : (
                               <View>
@@ -975,7 +1037,7 @@ useEffect(() => {
                     value={includeAudio}
                     onValueChange={setIncludeAudio}
                   />
-                  <Text>Allow your contributors to record audio in addition to a written message</Text>
+                  <Text>Pay $15 to allow your contributors to record audio in addition to text and pictures</Text>
                 </View>
 
                   <View style={{flexDirection: 'column', alignItems: 'center'}}>
@@ -983,7 +1045,7 @@ useEffect(() => {
                     value={physicalBook}
                     onValueChange={setPhysicalBook}
                   />
-                  <Text>Make this Bundl e-book a physical Bundl book for $99</Text>
+                  <Text>Pay $99 to make this e-book a physical book</Text>
                 </View>
 
                       <TouchableOpacity style={styles.button}     onPress={() => submitAndSendWelcomeMessage(tableData)}  >
@@ -1004,6 +1066,34 @@ const styles = StyleSheet.create({
   container: {
     padding: 10,
   },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    width: '80%',
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cardField: {
+    height: 50,
+    marginTop: 30,
+    width: '100%',
+  },
+  button: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    width: '100%',
+  },
+  textStyle: {
+    color: '#fff',
+    textAlign: 'center',
+  },
   card: {
     marginTop: 16,
     padding: 16,
@@ -1018,6 +1108,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    border: '3px solid black',
   },
   cardText: {
     fontSize: 14,
