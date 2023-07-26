@@ -617,16 +617,16 @@ useEffect(() => {
         };
         
      
-        const handleSelectContact = (contact) => {
-          const phoneNumber = contact.phoneNumbers ? contact.phoneNumbers[0].number : '';
+        const handleSelectContact = (contact, phoneNumber) => {  // Added phoneNumber as a parameter
           const contactWithPhoneNumber = { ...contact, phoneNumber };
         
-          if (selectedContactsMobile.some((selectedContact) => selectedContact.name === contact.name && selectedContact.phoneNumber === contact.phoneNumber)) {
-            setSelectedContactsMobile((prev) => prev.filter((selectedContact) => selectedContact.name !== contact.name || selectedContact.phoneNumber !== contact.phoneNumber));
+          if (selectedContactsMobile.some((selectedContact) => selectedContact.id === contact.id && selectedContact.phoneNumber === phoneNumber)) {
+            setSelectedContactsMobile((prev) => prev.filter((selectedContact) => selectedContact.id !== contact.id || selectedContact.phoneNumber !== phoneNumber));
           } else {
             setSelectedContactsMobile((prev) => [...prev, contactWithPhoneNumber]);
           }
         };
+        
         
         const handleAddToList = () => { // phone contacts
           setTableData(prev => [...prev, ...selectedContactsMobile]);
@@ -873,29 +873,37 @@ useEffect(() => {
         </View>
       
     </Modal>
-          <Modal visible={isContributorsModalVisible} transparent={true}>
-            <View style={{ margin: 50, backgroundColor: 'gray', borderRadius: 10, padding: 10, justifyContent: 'space-between'}}>
-              <Text>Your Contributors ({tableData.length})</Text>
-              <FlatList
-                data={tableData}
-                renderItem={({ item, index }) => (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10 }}>
-                    <View style={{ flexGrow: 1 }}>
-                      <Text>{item.name ? item.name : ''}</Text>
-                      <Text>{prioritizeEmail(item.emailAddresses)}</Text>
-                      <Text>{item.phoneNumber ? item.phoneNumber : ''}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(index)}>
-                      <Text style={styles.deleteButtonText}>X</Text>
-                    </TouchableOpacity>
+    <Modal visible={isContributorsModalVisible} transparent={true}>
+          <View style={{ 
+            margin: 50, 
+            height: screenHeight - 100,  // subtract the total margin from the screen height
+            backgroundColor: 'gray', 
+            borderRadius: 10, 
+            padding: 10, 
+            justifyContent: 'space-between'
+          }}>
+            <Text style={{ color: 'white', fontSize: 20 }}>Your Contributors ({tableData.length})</Text>
+            <FlatList
+              data={tableData}
+              renderItem={({ item, index }) => (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10 }}>
+                  <View style={{ flexGrow: 1 }}>
+                    <Text style={{ color: 'white', fontSize: 12 }}>{item.name ? item.name : ''}</Text>
+                    <Text style={{ color: 'white', fontSize: 10 }}>{prioritizeEmail(item.emailAddresses)}</Text>
+                    <Text style={{ color: 'white', fontSize: 10 }}>{item.phoneNumber ? item.phoneNumber : ''}</Text>
                   </View>
-                )}
-              />
-              <TouchableOpacity style={styles.button} onPress={() => setIsContributorsModalVisible(false)} >
-                <Text style={styles.buttonText}>Close</Text> 
-              </TouchableOpacity>
-            </View>
-          </Modal>
+                  <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(index)}>
+                    <Text style={styles.deleteButtonText}>X</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+            <TouchableOpacity style={styles.button} onPress={() => setIsContributorsModalVisible(false)} >
+              <Text style={styles.buttonText}>Close</Text> 
+            </TouchableOpacity>
+          </View>
+        </Modal>
+
 
           <Modal visible={modalVisible} transparent={true}>
                   <View style={{ 
@@ -906,27 +914,34 @@ useEffect(() => {
                         padding: 10, 
                         justifyContent: 'space-between'
                   }}>
-                    <Text style={{ color: 'white', fontSize: 20 }}>Contact List:</Text>
+                    <Text style={{ color: 'white', fontSize: 20  }}>Mobile Contact List:</Text>
                     <TextInput
-                        style={{ height: 40, borderColor: 'gray', borderWidth: 1, color: 'white' }}
+                        style={{ height: 40, borderColor: 'black', borderWidth: 2, color: 'white' }}
                         onChangeText={setSearchTermMobile}
                         value={searchTermMobile}
                         placeholder="Search contacts"
                         placeholderTextColor="white"
                     />
                     <FlatList
-                        data={filteredContacts}
-                        contentContainerStyle={{ alignItems: 'center' }}
-                        keyExtractor={(item) => item.id}
-                        renderItem={({ item }) => (
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Switch
-                                    value={selectedContactsMobile.some((selectedContact) => selectedContact.id === item.id)}
-                                    onValueChange={() => handleSelectContact(item)}
-                                />
-                                <Text style={{ color: 'white', fontSize: 18 }}>{item.name} | {item.phoneNumbers && item.phoneNumbers.length > 0 ? item.phoneNumbers[0].number : 'No phone number'}</Text>
-                            </View>
-                        )}
+                      data={filteredContacts}
+                      contentContainerStyle={{ padding: 2 }}
+                      keyExtractor={(item, index) => item.id + index}  // Modified keyExtractor
+                      renderItem={({ item }) => (
+                        // Map over phoneNumbers array
+                        item.phoneNumbers && item.phoneNumbers.map((phoneNumber, index) => (
+                          <View key={index} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Switch
+                            value={selectedContactsMobile.some((selectedContact) => selectedContact.id === item.id && selectedContact.phoneNumber === phoneNumber.number)}
+                            onValueChange={() => handleSelectContact(item, phoneNumber.number)}  
+                            style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }} 
+                          />
+
+                            <Text style={{ color: 'white', fontSize: 10 }}>
+                              {item.name} ({phoneNumber.label || 'Unknown'}) {phoneNumber.number || 'No phone number'}
+                            </Text>
+                          </View>
+                        ))
+                      )}
                     />
                     <TouchableOpacity style={styles.button} onPress={handleAddToList} color="white" >
                         <Text style={styles.buttonText}>Add phone numbers to list</Text>
@@ -938,49 +953,53 @@ useEffect(() => {
             </Modal>
 
             <Modal visible={isModalOpen} transparent={true}>
-                  <View style={{ 
-                  margin: 50, 
-                  height: screenHeight - 100,  // subtract the total margin from the screen height
-                  backgroundColor: 'gray', 
-                  borderRadius: 10, 
-                  padding: 10, 
-                  justifyContent: 'space-between'
-                }}>             
-           <TextInput placeholder="Search contacts..." onChangeText={handleSearch} />
-              <ScrollView>
-                {filteredContactsGoogle.map(contact => {
-                  // Check if the contact has an email
-                  const email = prioritizeEmailGoogle(contact.emailAddresses);
-                  if (email == "No email") {
-                    // If the contact doesn't have an email, don't render anything
-                    return null;
-                  }
+              <View style={{ 
+                margin: 50, 
+                height: screenHeight - 100,  // subtract the total margin from the screen height
+                backgroundColor: 'gray', 
+                borderRadius: 10, 
+                padding: 10, 
+                justifyContent: 'space-between'
+              }}>             
+                <Text style={{ color: 'white', fontSize: 20 }}>Google Contact List:</Text>
+                <TextInput
+                  style={{ height: 40, borderColor: 'black', borderWidth: 2, color: 'white' }}
+                  onChangeText={handleSearch}
+                  placeholder="Search contacts"
+                  placeholderTextColor="white"
+                />
+                <ScrollView>
+                  {filteredContactsGoogle.map(contact => {
+                    // Check if the contact has an email
+                    const email = prioritizeEmailGoogle(contact.emailAddresses);
+                    if (email == "No email") {
+                      // If the contact doesn't have an email, don't render anything
+                      return null;
+                    }
 
-                  // If the contact has an email, render the contact
-                  return (
-                    <View key={contact.resourceName} style={styles.contactContainer}>
-                      <Switch
-                        value={selectedContacts.includes(contact)}
-                        onValueChange={isChecked => handleContactSelect(contact, isChecked)}
-                      />
-                      <Text style={styles.contactText}>
-                        {contact.names && contact.names.length > 0 ? contact.names[0].displayName : 'Unnamed Contact'}
-                      </Text>
-                      <Text style={styles.contactText}>{email}</Text>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-              <View>
+                    // If the contact has an email, render the contact
+                    return (
+                      <View key={contact.resourceName} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Switch
+                          value={selectedContacts.includes(contact)}
+                          onValueChange={isChecked => handleContactSelect(contact, isChecked)}
+                          style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }} 
+                        />
+                        <Text style={{ color: 'white', fontSize: 9 }}>
+                          {contact.names && contact.names.length > 0 ? contact.names[0].displayName : 'Unnamed Contact'} | {email}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
                 <TouchableOpacity style={styles.button} onPress={addSelectedContactsToList} >
                   <Text style={styles.buttonText}>Add Emails to list</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.button} onPress={() => setIsModalOpen(false)} >
-                  <Text style={styles.buttonText}>Cancel</Text> 
+                  <Text style={styles.buttonText}>Close</Text> 
                 </TouchableOpacity>
               </View>
-            </View>
-          </Modal>
+            </Modal>
 
     <ScrollView style={styles.container}>
               <View style={styles.container} contentContainerStyle={{ alignItems: 'center' }} >
