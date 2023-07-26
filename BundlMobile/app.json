@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "BundlMobile",
-    "slug": "BundlMobile",
+    "name": "DTCBundl",
+    "slug": "DTCBundl",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,13 +19,14 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["com.googleusercontent.apps.764289968872-8spc0amg0j9n4lqjs0rr99s75dmmkpc7"]
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.764289968872-8spc0amg0j9n4lqjs0rr99s75dmmkpc7"
+            ]
           }
         ]
       },
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.dcgleason.BundlMobile"
     },
-    
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

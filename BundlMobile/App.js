@@ -11,12 +11,16 @@ import { PlatformPayButton, isPlatformPaySupported } from '@stripe/stripe-react-
 
 import { Dimensions } from 'react-native';
 import { CardField, useStripe } from '@stripe/stripe-react-native';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 
-function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contributors, physicalBook, includeAudio, gifterEmail }) {
+
+function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contributors, physicalBook, includeAudio, gifterEmail, sendWelcomeMessages }) {
   const { createPaymentMethod, confirmPayment } = useStripe();
   const [isApplePaySupported, setIsApplePaySupported] = useState(false);
   const [cardDetails, setCardDetails] = useState(null);
+  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
+  const [isErrorModalVisible, setIsErrorModalVisible] = useState(false);
 
   useEffect(() => {
     (async function () {
@@ -38,11 +42,12 @@ function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contribu
     });
     if (paymentMethodError) {
       console.log('Failed to create payment method:', paymentMethodError.message);
+      setIsErrorModalVisible(true);  // Show error modal
       return;
     }
 
     // Create a payment intent on the server
-    const response = await fetch('https://yay-api.herokuapp.com//stripe/secret', {
+    const response = await fetch('https://yay-api.herokuapp.com/stripe/secret', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -54,27 +59,87 @@ function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contribu
     });
 
     const data = await response.json();
+    console.log('Payment intent created:', data);
 
     // Confirm the payment
     const { error: confirmationError } = await confirmPayment(data.client_secret, {
-      type: 'Card',
+      paymentMethodType: 'Card',
       paymentMethodId: paymentMethod.id,
     });
 
     if (confirmationError) {
       console.log('Payment confirmation error:', confirmationError.message);
+      setIsErrorModalVisible(true);  // Show error modal
     } else {
       // Payment was successful
+      console.log('Payment successful');
       setIsModalVisible(false);
-        // Send the welcome messages
-     sendWelcomeMessages(contributors);
+      setIsSuccessModalVisible(true);  // Show success modal
+      // Send the welcome messages
+      console.log('contributors', contributors)
+      sendWelcomeMessages(contributors);
     }
   };
 
   return (
     <View>
-  
-
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isSuccessModalVisible}
+          onRequestClose={() => setIsSuccessModalVisible(false)}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ 
+              width: '50%', 
+              height: '10%',  // Set the height as desired
+              padding: 20, 
+              backgroundColor: 'white', 
+              borderRadius: 10, 
+              borderWidth: 2,  
+              borderColor: 'black',  
+              justifyContent: 'center',  // Center content vertically
+              alignItems: 'center'  // Center content horizontally
+            }}>
+              <Text>Payment successful.</Text>
+              <TouchableOpacity style={styles.button} onPress={() => setIsSuccessModalVisible(false)}>
+                <Text style={styles.textStyle}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        {/* Error Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isErrorModalVisible}
+          onRequestClose={() => setIsErrorModalVisible(false)}
+        >
+           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ 
+              width: '50%', 
+              height: '10%',  // Set the height as desired
+              padding: 20, 
+              backgroundColor: 'white', 
+              borderRadius: 10, 
+              borderWidth: 2,  
+              borderColor: 'black',  
+              justifyContent: 'center',  // Center content vertically
+              alignItems: 'center'  // Center content horizontally
+            }}>
+              <Text>Payment failed. Please try again.</Text>
+              <TouchableOpacity style={styles.button} onPress={() => setIsErrorModalVisible(false)}>
+                <Text style={styles.textStyle}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+    
+  <StripeProvider
+      publishableKey="pk_test_51KtCf1LVDYVdzLHCzEQuGuw08kKelgXO7AgN6VDN874gIPxfr7dl7PvcNgUZUSnypEOxqJcMCu4G119l0MQixCkj00Rr1fOuls"
+      urlScheme="com.googleusercontent.apps.764289968872-8spc0amg0j9n4lqjs0rr99s75dmmkpc7" // required for 3D Secure and bank redirects
+      merchantIdentifier="merchant.givebundl" // required for Apple Pay
+    >
   <Modal
         animationType="slide"
         transparent={true}
@@ -121,6 +186,7 @@ function PaymentModal({ isModalVisible, setIsModalVisible, totalAmount, contribu
         </View>
       </View>
     </Modal>
+    </StripeProvider>
     </View>
   );
 }
@@ -774,6 +840,7 @@ useEffect(() => {
             physicalBook={physicalBook}
             includeAudio={includeAudio}
             gifterEmail={gifterEmail}
+            sendWelcomeMessages={sendWelcomeMessages}
           />
         ) : null
       }
